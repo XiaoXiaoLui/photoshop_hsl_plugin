@@ -18,8 +18,13 @@
   <script>
     var UPDATE_INTERVAL = 500; // milliseconds
     var updateTimer = setInterval(updateColor, UPDATE_INTERVAL);
+    var g_isSending = false;
     
     function updateColor() {
+        if (g_isSending) {
+            return;
+        }
+        g_isSending = true;
         var exec = '$._ext_PHXS.getColor()'
 
         evalScript(exec, function(res) {
@@ -39,12 +44,13 @@
         evalScript(exec, function(res) {
             //var tmp = JSON.parse(res);
             //console.log("AllSampler::::" + res);
+            g_isSending = false;
             if (!g_isReading) {
                 return;
             }
             var colors = JSON.parse(res);
             updateSampler(colors);
-           
+            
             //alert(hsb_to_hsl(fdc.hsb));
         });
     }
