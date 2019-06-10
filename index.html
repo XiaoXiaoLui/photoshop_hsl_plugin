@@ -1,0 +1,335 @@
+<!doctype html>
+
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./ext.js"></script>
+<script src="./lib/CSInterface-4.0.0.js"></script>
+
+
+<link id="ppstyle" rel="stylesheet" type="text/css" href="./style.css">
+<title>HSL</title>
+
+</head>
+
+<body onLoad="onLoaded()">
+</body>
+  <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+  <script>
+    var UPDATE_INTERVAL = 500; // milliseconds
+    var updateTimer = setInterval(updateColor, UPDATE_INTERVAL);
+    
+    function updateColor() {
+        var exec = '$._ext_PHXS.getColor()'
+
+        evalScript(exec, function(res) {
+            //console.log("res:" + res);
+            if (!g_isReading) {
+                return;
+            }
+            var tmp = JSON.parse(res);
+            var fdc = tmp[0];
+            var bdc = tmp[1];
+            updateHSL(hsb2Hsl(fdc.hsb), hsb2Hsl(bdc.hsb));
+           
+            //alert(hsb_to_hsl(fdc.hsb));
+        });
+        
+        exec = '$._ext_PHXS.getAllColorSamplers()'
+        evalScript(exec, function(res) {
+            //var tmp = JSON.parse(res);
+            //console.log("AllSampler::::" + res);
+            if (!g_isReading) {
+                return;
+            }
+            var colors = JSON.parse(res);
+            updateSampler(colors);
+           
+            //alert(hsb_to_hsl(fdc.hsb));
+        });
+    }
+ 
+ 
+
+    function myStopFunction() {
+        if (updateTimer) {
+            clearInterval(updateTimer);
+        }
+      
+        updateTimer = null;
+    }
+
+    
+
+
+    // http://stackoverflow.com/a/31851617/1335032
+    // Note: HSB and HSV is same thing
+    function hsb2Hsl(color) {
+        var h = color.hue;
+        var s = color.saturation/100;
+        var v = color.brightness/100;
+        
+        // both hsv and hsl values are in [0, 1]
+        var l = (2 - s) * v / 2;
+        var t = Math.min(l, 1 - l);
+
+        if (l != 0 && l != 1) {
+            s = (v - l) / t;
+        }
+        else {
+            s = 0;
+            
+        }
+        
+
+        var hslColor = {};
+        hslColor.hue = Math.round(h);
+        hslColor.sat = Math.round(s*100);
+        hslColor.lumi = Math.round(l*100);
+
+        return hslColor;
+    }
+    
+    function hsl2Hsb(hslColor) {
+        var sat = hslColor.sat/100;
+        var lumi = hslColor.lumi/100;
+        var hsbColor = {};
+        hsbColor.saturation = NaN;
+      var t = sat * Math.min(lumi, 1 - lumi);
+      hsbColor.brightness = lumi + t;
+      hsbColor.saturation = hsbColor.brightness > 0 ? 2 - 2*lumi/hsbColor.brightness : 0;
+      hsbColor.hue = Math.round(hslColor.hue);
+      hsbColor.saturation = Math.round(hsbColor.saturation * 100);
+      hsbColor.brightness = Math.round(hsbColor.brightness * 100);
+      return hsbColor;
+    }
+    
+    //var g_lastSetColorTime = new Date();
+    function setColor() {
+        var hslColor = {};
+        var hslColor2 = {};
+        hslColor.hue = Number(document.getElementById("hueText").value);
+        hslColor.sat = Number(document.getElementById("satText").value);
+        hslColor.lumi = Number(document.getElementById("lumiText").value);
+        
+        hslColor2.hue = Number(document.getElementById("hueText2").value);
+        hslColor2.sat = Number(document.getElementById("satText2").value);
+        hslColor2.lumi = Number(document.getElementById("lumiText2").value);
+        //console.log("hue:%lf, sat:%lf, lumi:%lf", hslColor.hue, hslColor.sat, hslColor.lumi);
+        
+        var hsbColor = hsl2Hsb(hslColor);
+        var hsbColor2 = hsl2Hsb(hslColor2);
+        //console.log(JSON.stringify(hsbColor));
+        exec = '$._ext_PHXS.setColor(' + JSON.stringify(hsbColor) + ', ' + JSON.stringify(hsbColor2) + ')';
+
+        evalScript(exec, function(res) {
+            //console.log("res:" + res);
+            //var fdc = JSON.parse(res);
+            //updateHSL(hsb2Hsl(fdc.hsb));
+        });
+    }
+    
+    
+    function syncText() {
+        document.getElementById("hueText").value = document.getElementById("hueSlider").value;
+        document.getElementById("satText").value = document.getElementById("satSlider").value;
+        document.getElementById("lumiText").value = document.getElementById("lumiSlider").value;
+        
+        document.getElementById("hueText2").value = document.getElementById("hueSlider2").value;
+        document.getElementById("satText2").value = document.getElementById("satSlider2").value;
+        document.getElementById("lumiText2").value = document.getElementById("lumiSlider2").value;
+    }
+    
+    
+    function updateHSL(hslColor, hslColor2) {
+        document.getElementById("hueSlider").value = hslColor.hue;
+        document.getElementById("hueText").value = hslColor.hue;
+        document.getElementById("satSlider").value = hslColor.sat;
+        
+        document.getElementById("satText").value = hslColor.sat;
+        document.getElementById("lumiSlider").value = hslColor.lumi;
+        document.getElementById("lumiText").value = hslColor.lumi;
+        
+        document.getElementById("hueSlider2").value = hslColor2.hue;
+        document.getElementById("hueText2").value = hslColor2.hue;
+        document.getElementById("satSlider2").value = hslColor2.sat;
+        
+        document.getElementById("satText2").value = hslColor2.sat;
+        document.getElementById("lumiSlider2").value = hslColor2.lumi;
+        document.getElementById("lumiText2").value = hslColor2.lumi;
+        
+        //document.getElementById("output").innerHTML = hslColor.hue + ',' + hslColor.sat + ',' + hslColor.lumi;
+    }
+    
+    function updateSampler(hsbColors) {
+        var n = Math.min(4, hsbColors.length);
+        var hslColor;
+        var idH, idS, idL;
+        var i;
+        for (i = 0; i < n; i++) {
+            hslColor = hsb2Hsl(hsbColors[i].hsb);
+            idH = "sample" + i + '_h';
+            idS = "sample" + i + '_s';
+            idL = "sample" + i + '_l';
+            document.getElementById(idH).innerHTML = "#" + (i+1) + "&nbsp" + "&nbsp" + "H: " + hslColor.hue + "&deg";
+            document.getElementById(idS).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp" + "S: " + hslColor.sat + "%";
+            document.getElementById(idL).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp" +"L: " + hslColor.lumi + "%";
+        }
+        
+        for (; i < 4; i++)
+        {
+            idH = "sample" + i + '_h';
+            idS = "sample" + i + '_s';
+            idL = "sample" + i + '_l';
+            document.getElementById(idH).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp";
+            document.getElementById(idS).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp";
+            document.getElementById(idL).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp";
+        }
+    }
+    
+    var g_isReading = true;
+    function switchReadWrite() {
+        g_isReading = !g_isReading;
+        if (g_isReading) {
+            updateTimer = setInterval(updateColor, UPDATE_INTERVAL);
+        }
+        else {
+            myStopFunction();
+        }
+    }
+    
+    function setRead() {
+        console.log("setRead()");
+       
+        g_isReading = true;
+        updateTimer = setInterval(updateColor, UPDATE_INTERVAL);
+    }
+    
+    function setWrite() {
+        console.log("setWrite()");
+        g_isReading = false;
+        myStopFunction();
+    }
+    
+    function onSliderChange() {
+        if (g_isReading) {
+            return;
+        }
+        document.getElementById("hueText").value = document.getElementById("hueSlider").value;
+        document.getElementById("satText").value = document.getElementById("satSlider").value;
+        document.getElementById("lumiText").value = document.getElementById("lumiSlider").value;
+        
+        document.getElementById("hueText2").value = document.getElementById("hueSlider2").value;
+        document.getElementById("satText2").value = document.getElementById("satSlider2").value;
+        document.getElementById("lumiText2").value = document.getElementById("lumiSlider2").value;
+        setColor();
+    }
+    
+    function onTextChange() {
+        if (g_isReading) {
+            return;
+        }
+        document.getElementById("hueSlider").value = document.getElementById("hueText").value;
+        document.getElementById("satSlider").value = document.getElementById("satText").value;
+        document.getElementById("lumiSlider").value = document.getElementById("lumiText").value;
+        
+        document.getElementById("hueSlider2").value = document.getElementById("hueText2").value;
+        document.getElementById("satSlider2").value = document.getElementById("satText2").value;
+        document.getElementById("lumiSlider2").value = document.getElementById("lumiText2").value;
+        setColor();
+    }
+    
+    function onSliderMouseUp() {
+        var activeElement = document.activeElement;
+        if (activeElement.type != "range") {
+            return;
+        }
+        
+        onSliderChange();
+        setRead();
+    }
+   </script>
+   
+   <div id="backgroundBlock">
+        <fieldset>
+        <legend>foreground color</legend>
+       H <input type="range" min="0" max="360" value="0" class="slider" id="hueSlider"  onmousedown="setWrite()" onmouseup="onSliderMouseUp()"
+        style="width:60%;" oninput="syncText()" onchange="onSliderChange()"/>
+       <input type="text" min="0" max="360" value="0" id="hueText" style="width: 15%;" 
+        oninput="onTextChange()" onfocus="setWrite()" onblur="setRead()"/>&deg<br/>
+       
+       S <input type="range" min="0" max="100" value="0" class="slider" id="satSlider" onmousedown="setWrite()" onmouseup="onSliderMouseUp()"
+        style="width:60%;"  oninput="syncText()" onchange="onSliderChange()"/>
+       <input type="text" min="0" max="100" value="0" id="satText" style="width: 15%;" 
+       oninput="onTextChange()" onfocus="setWrite()" onblur="setRead()"/>%<br/>
+       
+       L <input type="range" min="0" max="100" value="0" class="slider" id="lumiSlider" onmousedown="setWrite()" onmouseup="onSliderMouseUp()"
+        style="width:60%;"  oninput="syncText()" onchange="onSliderChange()"/>
+       <input type="text" min="0" max="100" value="0" id="lumiText" style="width: 15%;" 
+        oninput="onTextChange()" onfocus="setWrite()" onblur="setRead()"/>%<br/>
+    </fieldset>
+       
+   </div>
+   
+   <div id="foregroundBlock">
+   <fieldset>
+        <legend>background color</legend>
+       H <input type="range" min="0" max="360" value="0" class="slider" id="hueSlider2"  onmousedown="setWrite()" onmouseup="onSliderMouseUp()"
+        style="width:60%;" oninput="syncText()" onchange="onSliderChange()"/>
+       <input type="text" min="0" max="360" value="0" id="hueText2" style="width: 15%;" 
+        oninput="onTextChange()" onfocus="setWrite()" onblur="setRead()"/>&deg<br/>
+       
+       S <input type="range" min="0" max="100" value="0" class="slider" id="satSlider2" onmousedown="setWrite()" onmouseup="onSliderMouseUp()"
+        style="width:60%;"  oninput="syncText()" onchange="onSliderChange()"/>
+       <input type="text" min="0" max="100" value="0" id="satText2" style="width: 15%;" 
+       oninput="onTextChange()" onfocus="setWrite()" onblur="setRead()"/>%<br/>
+       
+       L <input type="range" min="0" max="100" value="0" class="slider" id="lumiSlider2" onmousedown="setWrite()" onmouseup="onSliderMouseUp()"
+        style="width:60%;"  oninput="syncText()" onchange="onSliderChange()"/>
+       <input type="text" min="0" max="100" value="0" id="lumiText2" style="width: 15%;" 
+        oninput="onTextChange()" onfocus="setWrite()" onblur="setRead()"/>%<br/>
+    </fieldset>
+       
+   </div>
+   
+   <!--
+    <div style="color: white;" id="row0">
+        <div id="b00">Left Sie</div>
+        <div id="b01">Random</div>
+    </div>
+    <div style="color: white;" id="row1">
+        <div id="b10">Left Si</div>
+        <div id="b11">Random</div>
+    </div>
+    -->
+    <div class="grid-container">
+      <div class="grid-item">
+        <span id="sample0_h"> </span><br/>
+        <span id="sample0_s"> </span><br/>
+        <span id="sample0_l"> </span><br/>
+      </div>
+      <div class="grid-item"> 
+          <span id="sample1_h"> </span><br/>
+          <span id="sample1_s"> </span><br/>
+          <span id="sample1_l"> </span><br/>
+      </div>
+      <div class="grid-item">
+          <span id="sample2_h"> </span><br/>
+          <span id="sample2_s"> </span><br/>
+          <span id="sample2_l"> </span><br/>
+      </div>  
+      <div class="grid-item">
+          <span id="sample3_h"> </span><br/>
+          <span id="sample3_s"> </span><br/>
+          <span id="sample3_l"> </span><br/>
+      </div>
+    </div>
+
+  
+<!--  
+   <div style="color: white;">
+     <input type="radio" name="readOrWrite" value="read" checked onchange="switchReadWrite()" style="color: white;"> read<br>
+     <input type="radio" name="readOrWrite" value="write" onchange="switchReadWrite()" style="color: white;"> write<br>
+   </div>
+-->
+</html>

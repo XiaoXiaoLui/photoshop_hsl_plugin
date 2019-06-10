@@ -1,0 +1,94 @@
+
+body {
+text-align:center;
+}
+
+button, select, input
+{
+border:1px solid;
+}
+
+input[type=text]
+{
+height:10px;
+color: rgb(200, 200, 200);
+font-variant: normal;
+   font-size: 10px;
+   font-family:Arial;
+   
+}
+
+input[type=text]:focus {
+    background-color: "";
+}
+
+#content {
+margin-right:auto;
+margin-left:auto;
+vertical-align:middle;
+width:100%;
+}
+
+#content ul {
+padding:0px;
+}
+
+#content ul li {
+margin:3px 0px 3px 0px;
+}
+
+/*#row0, #row1 {
+    height: 65px; 
+    width:100%; 
+
+    display:flex;
+    margin: 3px 3px 0px 3px;
+}
+
+#b00, #b01, #b10, #b11 {
+    padding: 3px 3px 3px 3px;
+    display: inline-block; 
+    *display: inline; 
+    zoom: 1; 
+    border-style: solid;
+    border-width: 1px;
+    width: 43%;
+    border: solid
+    vertical-align: bottom;
+}*/
+
+#backgroundBlock, #foregroundBlock {
+   /*border: 2px solid rgb(70, 70, 70); */
+   color: rgb(200, 200, 200);
+   width: 100%;
+   font-size: 10px;
+   font-family:Arial;
+}
+
+fieldset {
+    color: rgb(200, 200, 200);
+    border: 2px solid rgb(70, 70, 70); 
+       font-size: 10px;
+   font-family:Arial;
+}
+
+.grid-container {
+  display: grid;
+  color: rgb(200, 200, 200);
+  grid-template-columns: auto auto;
+  /*background-color: #2196F3;*/
+  margin: 6px 3px 3px 3px;
+  border: 1px solid rgb(70, 70, 70);
+
+}
+.grid-item {
+  /*background-color: rgba(255, 255, 255, 0.8);*/
+  padding: 3px;
+  color: rgb(200, 200, 200);
+  font-size: 10px;
+  font-family:Arial;
+  font-variant: normal;
+  border: 1px solid rgb(70, 70, 70);
+  /*font-size: px;*/
+  text-align: left;
+}
