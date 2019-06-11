@@ -2,7 +2,7 @@
 html extension for showing hsl color in photoshop
 
 ## installation
-put the whole direction in cep extension folder, for me, it's
+put the whole directory in cep extension folder, for me, it's
 C:/Users/[me]/AppData/Roaming/Adobe/CEP/extensions
 
 ## to avoid signature problem
