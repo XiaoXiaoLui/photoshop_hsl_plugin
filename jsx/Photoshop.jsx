@@ -1423,20 +1423,35 @@ $._ext_PHXS={
         return JSON.lave([fdc, bdc]);
     },
     
-    setColor: function(hsbColorFg, hsbColorBg) {
+    setColor: function(colorFg, colorBg, colorType) {
         try {
-        app.foregroundColor.hsb.hue = hsbColorFg.hue;
-        app.foregroundColor.hsb.saturation = hsbColorFg.saturation;
-        app.foregroundColor.hsb.brightness = hsbColorFg.brightness;
-        
-        app.backgroundColor.hsb.hue = hsbColorBg.hue;
-        app.backgroundColor.hsb.saturation = hsbColorBg.saturation;
-        app.backgroundColor.hsb.brightness = hsbColorBg.brightness;
+            if (colorType == "HSB") {
+                app.foregroundColor.hsb.hue = colorFg.hue;
+                app.foregroundColor.hsb.saturation = colorFg.saturation;
+                app.foregroundColor.hsb.brightness = colorFg.brightness;
+                
+                app.backgroundColor.hsb.hue = colorBg.hue;
+                app.backgroundColor.hsb.saturation = colorBg.saturation;
+                app.backgroundColor.hsb.brightness = colorBg.brightness;
+            }
+            else if (colorType == "RGB") {
+                app.foregroundColor.rgb.red = colorFg.red;
+                app.foregroundColor.rgb.green = colorFg.green;
+                app.foregroundColor.rgb.blue = colorFg.blue;
+                
+                app.backgroundColor.rgb.red = colorBg.red;
+                app.backgroundColor.rgb.green = colorBg.green;
+                app.backgroundColor.rgb.blue = colorBg.blue;
+            }
+            else {
+                return "Unknown Type";
+            }
+
         } catch (e) {
             
         } finally {
             //return "xxxx";
-            return hsbColorFg + "::::" + JSON.lave(hsbColorFg) + "******" + JSON.lave(app.foregroundColor);
+            return colorFg + "::::" + JSON.lave(colorFg) + "******" + JSON.lave(app.foregroundColor);
         }
     },
     

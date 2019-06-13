@@ -19,6 +19,7 @@
     var UPDATE_INTERVAL = 500; // milliseconds
     var updateTimer = setInterval(updateColor, UPDATE_INTERVAL);
     var g_isSending = false;
+    var g_colorTypeSelected = "HCY";
     
     function updateColor() {
         if (g_isSending) {
@@ -35,7 +36,16 @@
             var tmp = JSON.parse(res);
             var fdc = tmp[0];
             var bdc = tmp[1];
-            updateHSL(hsb2Hsl(fdc.hsb), hsb2Hsl(bdc.hsb));
+            if (g_colorTypeSelected == "HSL") {
+                updateHSL(hsb2Hsl(fdc.hsb), hsb2Hsl(bdc.hsb));
+            }
+            else if (g_colorTypeSelected == "HCY") {
+                updateHCY(rgb2Hcy(fdc.rgb), rgb2Hcy(bdc.rgb));
+            }
+            else {
+                console.log("Unknown g_colorTypeSelected: " + g_colorTypeSelected);
+            }
+            
            
             //alert(hsb_to_hsl(fdc.hsb));
         });
@@ -110,29 +120,193 @@
       return hsbColor;
     }
     
+    // reference: https://stackoverflow.com/questions/12121393/please-explain-this-color-blending-mode-formula-so-i-can-replicate-it-in-php-ima
+    const R_COFF = 0.30;
+    const G_COFF = 0.59;
+    const B_COFF = 0.11;
+    var g_offset = [];
+    for (var i = 0; i <= 1; i += 0.01) {
+        g_offset.push(i);
+        g_offset.push(-i);
+    }
+    function hcy2Rgb(hcyColor) {
+        var r;
+        var g;
+        var b;
+        var h;
+        var c;
+        var y;
+        var idx = 0;
+        
+        for (idx = 0; idx <= 200; idx++) {
+        
+            h = hcyColor.h % 360;
+            c = Math.round(hcyColor.c) / 100 + g_offset[idx];
+            c = Math.min(1, Math.max(0, c));
+            y = hcyColor.y / 100;
+            //y = Math.max(0.002, y);
+            
+
+
+
+            var k; // Intermediate variable.
+
+            if (h >= 0 && h < 60) {           // Sector 0: 0° - 60°
+                k = c * h / 60;
+                b = y - R_COFF * c - G_COFF * k;
+                r = b + c;
+                g = b + k;
+            } else if (h >= 60 && h < 120) {  // Sector 1: 60° - 120°
+                k = c * (h - 60) / 60;
+                g = y + B_COFF * c + R_COFF * k;
+                b = g - c;
+                r = g - k;
+            } else if (h >= 120 && h < 180) { // Sector 2: 120° - 180°
+                k = c * (h - 120) / 60;
+                r = y - G_COFF * c - B_COFF * k;
+                g = r + c;
+                b = r + k;
+            } else if (h >= 180 && h < 240) { // Sector 3: 180° - 240°
+                k = c * (h - 180) / 60;
+                b = y + R_COFF * c + G_COFF * k;
+                r = b - c;
+                g = b - k;
+            } else if (h >= 240 && h < 300) { // Sector 4: 240° - 300°
+                k = c * (h - 240) / 60;
+                g = y - B_COFF * c - R_COFF * k;
+                b = g + c;
+                r = g + k;
+            } else {                          // Sector 5: 300° - 360°
+                k = c * (h - 300) / 60;
+                r = y + G_COFF * c + B_COFF * k;
+                g = r - c;
+                b = r - k;
+            }
+
+            // Approximations erros can cause values to exceed bounds.
+            
+            
+            // some hcy value correspond invalid rgb value, need to avoid this
+            // and it's not a bug that the hcy value auto changes after setting an invalid value.
+            // fix h and y, adjust c to make rgb valid
+            if (!(r < 0 || r > 1 || g < 0 || g > 1 || b < 0 || b > 1)) {
+                break;
+            }
+        } 
+        if (idx >= 200) {
+            console.log("no valid c found:idx=" + idx);
+        }
+        /*rgbColor.red = Math.min(Math.max(r, 0), 1) * 255;
+        rgbColor.green = Math.min(Math.max(g, 0), 1) * 255;
+        rgbColor.blue = Math.min(Math.max(b, 0), 1) * 255;*/
+        var rgbColor = {};
+        rgbColor.red = r * 255;
+        rgbColor.green = g * 255;
+        rgbColor.blue = b * 255;
+        
+        return rgbColor;
+    }
+    
+    function rgb2Hcy(rgbColor) {
+        var TIMES = 100000;
+        var r = Math.round(rgbColor.red * TIMES) / TIMES / 255;
+        var g = Math.round(rgbColor.green * TIMES) / TIMES / 255;
+        var b = Math.round(rgbColor.blue * TIMES) / TIMES / 255;
+
+        var h;
+        var c;
+        var y;
+        var hcy = {};
+
+        // For saturation equals to 0 any value of hue are valid.
+        // In this case we choose 0 as a default value.
+
+        if (r == g && g == b) {            // Limit case.
+            c = 0; 
+            h = 0; 
+        } else if ((r >= g) && (g >= b)) { // Sector 0: 0° - 60°
+            c = r - b;
+            h = 60 * (g - b) / c;
+        } else if ((g >= r) && (r >= b)) {  // Sector 1: 60° - 120°
+            c = g - b;
+            h = 60 * (g - r) / c  + 60;
+        } else if ((g >= b) && (b >= r)) {  // Sector 2: 120° - 180°
+            c = g - r;
+            h = 60 * (b - r) / c + 120;
+        } else if ((b >= g) && (g >= r)) {   // Sector 3: 180° - 240°
+            c = b - r;
+            h = 60 * (b - g) / c + 180;
+        } else if ((b >= r) && (r >= g)) {  // Sector 4: 240° - 300°
+            c = b - g;
+            h = 60 * (r - g) / c + 240;
+        } else {                           // Sector 5: 300° - 360°
+            c = r - g;
+            h = 60 * (r - b) / c + 300;
+        }
+
+        y = R_COFF * r + G_COFF * g + B_COFF * b;
+
+        // Approximations error can cause values to exceed bounds.
+       // console.log(h + ',' + c + ',' + y);
+        hcy.h = Math.round(h % 360);
+        hcy.c = Math.round(Math.min(Math.max(c, 0), 1) * 100);
+        hcy.y = Math.round(Math.min(Math.max(y, 0), 1) * 100);
+        return hcy;
+    }
+    
     //var g_lastSetColorTime = new Date();
     function setColor() {
         var hslColor = {};
         var hslColor2 = {};
-        hslColor.hue = Number(document.getElementById("hueText").value);
-        hslColor.sat = Number(document.getElementById("satText").value);
-        hslColor.lumi = Number(document.getElementById("lumiText").value);
-        
-        hslColor2.hue = Number(document.getElementById("hueText2").value);
-        hslColor2.sat = Number(document.getElementById("satText2").value);
-        hslColor2.lumi = Number(document.getElementById("lumiText2").value);
-        //console.log("hue:%lf, sat:%lf, lumi:%lf", hslColor.hue, hslColor.sat, hslColor.lumi);
-        
-        var hsbColor = hsl2Hsb(hslColor);
-        var hsbColor2 = hsl2Hsb(hslColor2);
-        //console.log(JSON.stringify(hsbColor));
-        exec = '$._ext_PHXS.setColor(' + JSON.stringify(hsbColor) + ', ' + JSON.stringify(hsbColor2) + ')';
+        var hcyColor = {};
+        var hcyColor2 = {};
+        if (g_colorTypeSelected == "HSL") {
+            hslColor.hue = Number(document.getElementById("hueText").value);
+            hslColor.sat = Number(document.getElementById("satText").value);
+            hslColor.lumi = Number(document.getElementById("lumiText").value);
+            
+            hslColor2.hue = Number(document.getElementById("hueText2").value);
+            hslColor2.sat = Number(document.getElementById("satText2").value);
+            hslColor2.lumi = Number(document.getElementById("lumiText2").value);
+            //console.log("hue:%lf, sat:%lf, lumi:%lf", hslColor.hue, hslColor.sat, hslColor.lumi);
+            
+            var hsbColor = hsl2Hsb(hslColor);
+            var hsbColor2 = hsl2Hsb(hslColor2);
+            //console.log(JSON.stringify(hsbColor));
+            exec = '$._ext_PHXS.setColor(' + JSON.stringify(hsbColor) + ', ' + JSON.stringify(hsbColor2) + ', "HSB"' + ')';
 
-        evalScript(exec, function(res) {
-            //console.log("res:" + res);
-            //var fdc = JSON.parse(res);
-            //updateHSL(hsb2Hsl(fdc.hsb));
-        });
+            evalScript(exec, function(res) {
+                //console.log("res:" + res);
+                //var fdc = JSON.parse(res);
+                //updateHSL(hsb2Hsl(fdc.hsb));
+            });
+        } else if (g_colorTypeSelected == "HCY") {
+            hcyColor.h = Number(document.getElementById("hueText").value);
+            hcyColor.c = Number(document.getElementById("satText").value);
+            hcyColor.y = Number(document.getElementById("lumiText").value);
+            
+            hcyColor2.h = Number(document.getElementById("hueText2").value);
+            hcyColor2.c = Number(document.getElementById("satText2").value);
+            hcyColor2.y = Number(document.getElementById("lumiText2").value);
+            //console.log("hue:%lf, sat:%lf, lumi:%lf", hslColor.hue, hslColor.sat, hslColor.lumi);
+            
+            var rgbColor = hcy2Rgb(hcyColor);
+            var rgbColor2 = hcy2Rgb(hcyColor2);
+            console.log(JSON.stringify(hcyColor));
+            console.log(JSON.stringify(rgbColor));
+            console.log(JSON.stringify(rgb2Hcy(rgbColor)));
+            
+            //console.log(JSON.stringify(hsbColor));
+            exec = '$._ext_PHXS.setColor(' + JSON.stringify(rgbColor) + ', ' + JSON.stringify(rgbColor2) + ', "RGB"' + ')';
+
+            evalScript(exec, function(res) {
+                //console.log("res:" + res);
+                //var fdc = JSON.parse(res);
+                //updateHSL(hsb2Hsl(fdc.hsb));
+            });
+        } else {
+            console.log("error g_colorTypeSelected:" + g_colorTypeSelected);
+        }
     }
     
     
@@ -167,43 +341,84 @@
         //document.getElementById("output").innerHTML = hslColor.hue + ',' + hslColor.sat + ',' + hslColor.lumi;
     }
     
-    function updateSampler(hsbColors) {
-        var n = Math.min(4, hsbColors.length);
-        var hslColor;
+    function updateHCY(hcyColor, hcyColor2) {
+        document.getElementById("hueSlider").value = hcyColor.h;
+        document.getElementById("hueText").value = hcyColor.h;
+        document.getElementById("satSlider").value = hcyColor.c;
+        document.getElementById("satText").value = hcyColor.c;
+        document.getElementById("lumiSlider").value = hcyColor.y;
+        document.getElementById("lumiText").value = hcyColor.y;
+        
+        document.getElementById("hueSlider2").value = hcyColor2.h;
+        document.getElementById("hueText2").value = hcyColor2.h;
+        document.getElementById("satSlider2").value = hcyColor2.c;
+        document.getElementById("satText2").value = hcyColor2.c;
+        document.getElementById("lumiSlider2").value = hcyColor2.y;
+        document.getElementById("lumiText2").value = hcyColor2.y;
+        
+        //document.getElementById("output").innerHTML = hslColor.hue + ',' + hslColor.sat + ',' + hslColor.lumi;
+    }
+    
+    function updateSampler(colors) {
+        var MAX_N = 8;
+        var n = Math.min(MAX_N, colors.length);
         var idH, idS, idL;
         var i;
-        for (i = 0; i < n; i++) {
-            hslColor = hsb2Hsl(hsbColors[i].hsb);
-            idH = "sample" + i + '_h';
-            idS = "sample" + i + '_s';
-            idL = "sample" + i + '_l';
-            document.getElementById(idH).innerHTML = "#" + (i+1) + "&nbsp" + "&nbsp" + "H: " + hslColor.hue + "&deg";
-            document.getElementById(idS).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp" + "S: " + hslColor.sat + "%";
-            document.getElementById(idL).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp" +"L: " + hslColor.lumi + "%";
+        if (g_colorTypeSelected == "HSL") {
+            var hsbColors = colors;
+            var hslColor;
+            
+            for (i = 0; i < n; i++) {
+                hslColor = hsb2Hsl(hsbColors[i].hsb);
+                idH = "sample" + i + '_h';
+                idS = "sample" + i + '_s';
+                idL = "sample" + i + '_l';
+                document.getElementById(idH).innerHTML = "#" + (i+1) + "&nbsp" + "&nbsp" + "H: " + hslColor.hue + "&deg";
+                document.getElementById(idS).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp" + "S: " + hslColor.sat + "%";
+                document.getElementById(idL).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp" + g_colorTypeSelected[2] + ": " + hslColor.lumi + "%";
+            }
+            
+            for (; i < MAX_N; i++)
+            {
+                idH = "sample" + i + '_h';
+                idS = "sample" + i + '_s';
+                idL = "sample" + i + '_l';
+                document.getElementById(idH).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp";
+                document.getElementById(idS).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp";
+                document.getElementById(idL).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp";
+            }
         }
-        
-        for (; i < 4; i++)
-        {
-            idH = "sample" + i + '_h';
-            idS = "sample" + i + '_s';
-            idL = "sample" + i + '_l';
-            document.getElementById(idH).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp";
-            document.getElementById(idS).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp";
-            document.getElementById(idL).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp";
+        else if (g_colorTypeSelected == "HCY") {
+            var rgbColors = colors;
+            var hcyColor;
+            
+            for (i = 0; i < n; i++) {
+                hcyColor = rgb2Hcy(rgbColors[i].rgb);
+                idH = "sample" + i + '_h';
+                idS = "sample" + i + '_s';
+                idL = "sample" + i + '_l';
+                document.getElementById(idH).innerHTML = "#" + (i+1) + "&nbsp" + "&nbsp" + "H: " + hcyColor.h + "&deg";
+                document.getElementById(idS).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp" + "C: " + hcyColor.c + "%";
+                document.getElementById(idL).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp" + g_colorTypeSelected[2] + ": " + hcyColor.y + "%";
+            }
+            
+            for (; i < MAX_N; i++)
+            {
+                idH = "sample" + i + '_h';
+                idS = "sample" + i + '_s';
+                idL = "sample" + i + '_l';
+                document.getElementById(idH).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp";
+                document.getElementById(idS).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp";
+                document.getElementById(idL).innerHTML = "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp";
+            }
+        }
+        else {
+            console.log("error g_colorTypeSelected:" + g_colorTypeSelected);
         }
     }
     
     var g_isReading = true;
-    function switchReadWrite() {
-        g_isReading = !g_isReading;
-        if (g_isReading) {
-            updateTimer = setInterval(updateColor, UPDATE_INTERVAL);
-        }
-        else {
-            myStopFunction();
-        }
-    }
-    
+
     function setRead() {
         console.log("setRead()");
        
@@ -254,22 +469,44 @@
         onSliderChange();
         setRead();
     }
+    
+    function switchColorType() {
+        g_colorTypeSelected = $("input[name='colorType']:checked").val();
+        document.getElementsByClassName("LORY")[0].innerHTML = g_colorTypeSelected == "HSL" ? "L" : "Y";
+        document.getElementsByClassName("LORY")[1].innerHTML = g_colorTypeSelected == "HSL" ? "L" : "Y";
+        
+        document.getElementsByClassName("SORC")[0].innerHTML = g_colorTypeSelected == "HSL" ? "S" : "C";
+        document.getElementsByClassName("SORC")[1].innerHTML = g_colorTypeSelected == "HSL" ? "S" : "C";
+        console.log(document.getElementsByClassName("LORY"));
+        console.log(g_colorTypeSelected);
+    }
+    
+    function test() {
+        var rgbColor = {"red": 74, "green": 127, "blue": 234};
+        console.log(JSON.stringify(rgbColor));
+        var hcyColor = rgb2Hcy(rgbColor);
+        console.log(JSON.stringify(hcyColor));
+        var rgbColor2 = hcy2Rgb(hcyColor);
+        console.log(JSON.stringify(rgbColor2));
+        g_isSending = true;
+    }
+    //test();
    </script>
    
    <div id="backgroundBlock">
         <fieldset>
         <legend>foreground color</legend>
-       H <input type="range" min="0" max="360" value="0" class="slider" id="hueSlider"  onmousedown="setWrite()" onmouseup="onSliderMouseUp()"
+       H <input type="range" min="0" max="359" value="0" class="slider" id="hueSlider"  onmousedown="setWrite()" onmouseup="onSliderMouseUp()"
         style="width:60%;" oninput="syncText()" onchange="onSliderChange()"/>
-       <input type="text" min="0" max="360" value="0" id="hueText" style="width: 15%;" 
+       <input type="text" min="0" max="359" value="0" id="hueText" style="width: 15%;" 
         oninput="onTextChange()" onfocus="setWrite()" onblur="setRead()"/>&deg<br/>
        
-       S <input type="range" min="0" max="100" value="0" class="slider" id="satSlider" onmousedown="setWrite()" onmouseup="onSliderMouseUp()"
+       <span class="SORC">C</span> <input type="range" min="0" max="100" value="0" class="slider" id="satSlider" onmousedown="setWrite()" onmouseup="onSliderMouseUp()"
         style="width:60%;"  oninput="syncText()" onchange="onSliderChange()"/>
        <input type="text" min="0" max="100" value="0" id="satText" style="width: 15%;" 
        oninput="onTextChange()" onfocus="setWrite()" onblur="setRead()"/>%<br/>
        
-       L <input type="range" min="0" max="100" value="0" class="slider" id="lumiSlider" onmousedown="setWrite()" onmouseup="onSliderMouseUp()"
+       <span class="LORY">Y</span> <input type="range" min="0" max="100" value="0" class="slider" id="lumiSlider" onmousedown="setWrite()" onmouseup="onSliderMouseUp()"
         style="width:60%;"  oninput="syncText()" onchange="onSliderChange()"/>
        <input type="text" min="0" max="100" value="0" id="lumiText" style="width: 15%;" 
         oninput="onTextChange()" onfocus="setWrite()" onblur="setRead()"/>%<br/>
@@ -280,17 +517,17 @@
    <div id="foregroundBlock">
    <fieldset>
         <legend>background color</legend>
-       H <input type="range" min="0" max="360" value="0" class="slider" id="hueSlider2"  onmousedown="setWrite()" onmouseup="onSliderMouseUp()"
+       H <input type="range" min="0" max="359" value="0" class="slider" id="hueSlider2"  onmousedown="setWrite()" onmouseup="onSliderMouseUp()"
         style="width:60%;" oninput="syncText()" onchange="onSliderChange()"/>
-       <input type="text" min="0" max="360" value="0" id="hueText2" style="width: 15%;" 
+       <input type="text" min="0" max="359" value="0" id="hueText2" style="width: 15%;" 
         oninput="onTextChange()" onfocus="setWrite()" onblur="setRead()"/>&deg<br/>
        
-       S <input type="range" min="0" max="100" value="0" class="slider" id="satSlider2" onmousedown="setWrite()" onmouseup="onSliderMouseUp()"
+       <span class="SORC">C</span> <input type="range" min="0" max="100" value="0" class="slider" id="satSlider2" onmousedown="setWrite()" onmouseup="onSliderMouseUp()"
         style="width:60%;"  oninput="syncText()" onchange="onSliderChange()"/>
        <input type="text" min="0" max="100" value="0" id="satText2" style="width: 15%;" 
        oninput="onTextChange()" onfocus="setWrite()" onblur="setRead()"/>%<br/>
        
-       L <input type="range" min="0" max="100" value="0" class="slider" id="lumiSlider2" onmousedown="setWrite()" onmouseup="onSliderMouseUp()"
+       <span class="LORY">Y</span> <input type="range" min="0" max="100" value="0" class="slider" id="lumiSlider2" onmousedown="setWrite()" onmouseup="onSliderMouseUp()"
         style="width:60%;"  oninput="syncText()" onchange="onSliderChange()"/>
        <input type="text" min="0" max="100" value="0" id="lumiText2" style="width: 15%;" 
         oninput="onTextChange()" onfocus="setWrite()" onblur="setRead()"/>%<br/>
@@ -329,13 +566,35 @@
           <span id="sample3_s"> </span><br/>
           <span id="sample3_l"> </span><br/>
       </div>
+      <div class="grid-item">
+          <span id="sample4_h"> </span><br/>
+          <span id="sample4_s"> </span><br/>
+          <span id="sample4_l"> </span><br/>
+      </div>
+      <div class="grid-item">
+          <span id="sample5_h"> </span><br/>
+          <span id="sample5_s"> </span><br/>
+          <span id="sample5_l"> </span><br/>
+      </div>
+      <div class="grid-item">
+          <span id="sample6_h"> </span><br/>
+          <span id="sample6_s"> </span><br/>
+          <span id="sample6_l"> </span><br/>
+      </div>
+      <div class="grid-item">
+          <span id="sample7_h"> </span><br/>
+          <span id="sample7_s"> </span><br/>
+          <span id="sample7_l"> </span><br/>
+      </div>
     </div>
 
-  
-<!--  
-   <div style="color: white;">
-     <input type="radio" name="readOrWrite" value="read" checked onchange="switchReadWrite()" style="color: white;"> read<br>
-     <input type="radio" name="readOrWrite" value="write" onchange="switchReadWrite()" style="color: white;"> write<br>
+   <div id="colorTypeGroup">
+    <fieldset>
+     <legend>HCY/HSL</legend>
+         <input type="radio" name="colorType" value="HCY" checked onchange="switchColorType()" > HCY
+         &nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp
+         <input type="radio" name="colorType" value="HSL" onchange="switchColorType()"> HSL<br>
+     </fieldset>
    </div>
--->
+
 </html>
